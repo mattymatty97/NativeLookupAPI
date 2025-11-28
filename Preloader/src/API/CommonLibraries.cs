@@ -52,7 +52,7 @@ public static class CommonLibraries
             var outputCacheFile = Path.Combine(NativeLookupAPI.ModCachePath, $"{finalInfo.ModuleName}.{finalGuid}.tsv");
             try
             {
-                using var writer = new StreamWriter("./cache/testfile.tsv");
+                using var writer = new StreamWriter(outputCacheFile);
                 foreach (var (symbol, memory) in library.SymbolCache)
                 {
                     foreach (var (name, offset) in memory)

@@ -8,7 +8,7 @@
     </PropertyGroup>
 	
     <PropertyGroup>
-        <DebugToolsVersion>20230731.1609.0</DebugToolsVersion>
+        <DebugToolsVersion>20240911.1650.0</DebugToolsVersion>
     </PropertyGroup>
     
     <ItemGroup>
@@ -18,15 +18,6 @@
         <PackageReference Include="Microsoft.Debugging.Platform.SymSrv" Version="$(DebugToolsVersion)" Private="True" />
     </ItemGroup>
 	
-    <!-- Defining the reference files that have to be publicized. -->
-    <ItemGroup>
-        <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.1" PrivateAssets="all"/>
-
-        <!-- Publicize directly when referencing -->
-
-        <!-- clean referencing -->
-    </ItemGroup>
-	
 	<Target Name="CopyForUpload" AfterTargets="Build">
         <PropertyGroup>
             <DistributionDir>$(SolutionDir)\Output\dist</DistributionDir>
@@ -34,6 +25,7 @@
         <PropertyGroup>
             <PreloaderOutDir>$(SolutionDir)\Preloader\$(OutDir)</PreloaderOutDir>
             <PreloaderDistributionDir>$(DistributionDir)\BepInEx\patchers</PreloaderDistributionDir>
+            <CoreDistributionDir>$(DistributionDir)\BepInEx\core</CoreDistributionDir>
         </PropertyGroup>
 
         <Message Importance="High" Text="Copying Preloader to DistributionDir" />

@@ -31,7 +31,7 @@ internal class NativeLookupAPI
 	{
 		Log.LogInfo("Preloader Started");
 		Directory.CreateDirectory(PdbCachePath);
-		//force class to run static constructor
+		//trigger static constructor
 		_ = CommonLibraries.UnityPlayer;
 	}
 

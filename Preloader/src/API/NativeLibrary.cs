@@ -10,7 +10,7 @@ using NativeLookupAPI.Proxy;
 
 namespace NativeLookupAPI.API;
 
-public unsafe class NativeLibrary
+public class NativeLibrary
 {
 
     public static NativeLibrary Find(Predicate<ProcessModule> modulePredicate)
@@ -273,5 +273,6 @@ public unsafe class NativeLibrary
 
     ~NativeLibrary() => OnFinalize?.Invoke(this);
     
+
     
 }

@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Linq;
-using System.Linq.Expressions;
 using System.Runtime.InteropServices;
 using NativeLookupAPI.Proxy;
 
@@ -8,7 +6,6 @@ namespace NativeLookupAPI.API;
 
 public static class NativeExtensions
 {
-
     
     public static uint? GetExportedFunctionOffset(this NativeLibrary library, string functionName)
     {

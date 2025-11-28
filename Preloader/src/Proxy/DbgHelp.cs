@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
-#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
 
 namespace NativeLookupAPI.Proxy;
 
-public static unsafe class DbgHelp
+public static class DbgHelp
 {
     [DllImport("dbghelp.dll", EntryPoint = "SymInitialize", SetLastError = true, CharSet = CharSet.Ansi)]
     internal static extern bool Initialize(IntPtr hProcess, string userSearchPath, bool fInvadeProcess);
@@ -333,7 +331,8 @@ public static unsafe class DbgHelp
 
 		internal uint TypeIndex;
 
-		internal fixed ulong Reserved[2];
+		internal ulong Reserved_1;
+		internal ulong Reserved_2;
 
 		internal uint Index;
 
