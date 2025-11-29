@@ -7,14 +7,14 @@ namespace NativeLookupAPI.API;
 public static class NativeExtensions
 {
     
-    public static uint? GetExportedFunctionOffset(this NativeLibrary library, string functionName)
+    public static nint? GetExportedFunctionOffset(this NativeLibrary library, string functionName)
     {
         if(library.TryGetExportedFunctionOffset(functionName, out var offset))
             return offset;
         return null;
     }
     
-    public static uint? GetSymbolOffset(this NativeLibrary library, DbgHelp.SymbolType symbolType, string symbolName)
+    public static nint? GetSymbolOffset(this NativeLibrary library, DbgHelp.SymbolType symbolType, string symbolName)
     {
         if(library.TryGetSymbolOffset(symbolType, symbolName, out var offset))
             return offset;
@@ -38,20 +38,20 @@ public static class NativeExtensions
     {
         public NativeLibrary Library { get; }
 
-        public uint          Offset { get; }
+        public nint          Offset { get; }
         
         public string        Name { get; }
 
-        public IntPtr        Address => Library.Address + (int)Offset;
+        public IntPtr        Address => Library.Address + Offset;
         
-        internal NativeFunction(NativeLibrary library, string functionName, uint offset)
+        internal NativeFunction(NativeLibrary library, string functionName, nint offset)
         {
             Library = library;
             Name = functionName;
             Offset = offset;
         }
         
-        private T _delegate = null;
+        private T? _delegate = null;
         
         public T Delegate
         {

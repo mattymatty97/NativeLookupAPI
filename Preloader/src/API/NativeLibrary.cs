@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.InteropServices;
 using NativeLookupAPI.Proxy;
@@ -12,7 +11,7 @@ namespace NativeLookupAPI.API;
 public class NativeLibrary
 {
 
-    public static NativeLibrary Find(Predicate<ProcessModule> modulePredicate)
+    public static NativeLibrary? Find(Predicate<ProcessModule> modulePredicate)
     {
         var entry = KnownModules.FirstOrDefault(
             e => modulePredicate.Invoke(e.Key) && e.Value.TryGetTarget(out _)
@@ -22,7 +21,7 @@ public class NativeLibrary
         
         var modules = Process.GetCurrentProcess().Modules;
 
-        ProcessModule target = null;
+        ProcessModule? target = null;
         
         for (var i = 0; i < modules.Count; i++)
         {
@@ -51,7 +50,7 @@ public class NativeLibrary
     public bool HasPdb { get; private set; }
 
     public Guid? PdbGUID => LibraryInfo?.PdbSig70;
-    public string Signature => HasPdb ? LibraryInfo!.Value.PdbSig70.ToString("N").ToUpper() + LibraryInfo!.Value.PdbAge : null;
+    public string? Signature => HasPdb ? LibraryInfo!.Value.PdbSig70.ToString("N").ToUpper() + LibraryInfo!.Value.PdbAge : null;
     
     public DbgHelp.ImageHlpModule64? LibraryInfo { get; private set; }
 
@@ -63,15 +62,15 @@ public class NativeLibrary
 
     public int LastError { get; private set; }
 
-    public event Action<NativeLibrary> OnFinalize;
+    public event Action<NativeLibrary>? OnFinalize;
 
-    public IDictionary<DbgHelp.SymbolType,IDictionary<string, uint>> SymbolCache { get; }
+    public IDictionary<DbgHelp.SymbolType,IDictionary<string, nint>> SymbolCache { get; }
     
-    public IDictionary<DbgHelp.SymbolType, IDictionary<string, uint>> PdbSymbols
+    public IDictionary<DbgHelp.SymbolType, IDictionary<string, nint>> PdbSymbols
     {
         get
         {
-            Dictionary<DbgHelp.SymbolType, IDictionary<string, uint>> ret = new();
+            Dictionary<DbgHelp.SymbolType, IDictionary<string, nint>> ret = new();
 
             var symbols = PdbSymbolsInternal;
             foreach (var (key, value) in symbols)
@@ -79,19 +78,19 @@ public class NativeLibrary
                 if (value.Count <= 0)
                     continue;
                 
-                ret[key] = new ReadOnlyDictionary<string, uint>(value);
+                ret[key] = new ReadOnlyDictionary<string, nint>(value);
             }
             
-            return new ReadOnlyDictionary<DbgHelp.SymbolType, IDictionary<string, uint>>(ret);
+            return new ReadOnlyDictionary<DbgHelp.SymbolType, IDictionary<string, nint>>(ret);
         }
     }
 
-    public bool TryGetExportedFunctionOffset(string functionName, out uint offset)
+    public bool TryGetExportedFunctionOffset(string functionName, out nint offset)
     {
         offset = 0;
         
         if (!SymbolCache.TryGetValue(DbgHelp.SymbolType.Export, out var cache))
-            SymbolCache[DbgHelp.SymbolType.Export] = cache = new Dictionary<string, uint>();
+            SymbolCache[DbgHelp.SymbolType.Export] = cache = new Dictionary<string, nint>();
         
         if(cache.TryGetValue(functionName, out offset))
         {
@@ -107,19 +106,19 @@ public class NativeLibrary
             return false;
         }
 
-        offset = (uint)(address.ToInt32() - Address.ToInt32());
+        offset = address.ToInt32() - Address.ToInt32();
         cache[functionName] = offset;
         return true;
     }
 
     
-    public bool TryGetSymbolOffset(DbgHelp.SymbolType symbolType, string symbolName, out uint symbolOffset)
+    public bool TryGetSymbolOffset(DbgHelp.SymbolType symbolType, string symbolName, out nint symbolOffset)
     {
         if (symbolType == DbgHelp.SymbolType.Export)
             return TryGetExportedFunctionOffset(symbolName, out symbolOffset);
         
         if (!SymbolCache.TryGetValue(symbolType, out var cache))
-            SymbolCache[DbgHelp.SymbolType.Export] = cache = new Dictionary<string, uint>();
+            SymbolCache[DbgHelp.SymbolType.Export] = cache = new Dictionary<string, nint>();
         
         if (cache.TryGetValue(symbolName, out symbolOffset))
             return symbolOffset != 0;
@@ -141,16 +140,16 @@ public class NativeLibrary
     
     private string[] _symbolServers = [];
         
-    private readonly WeakReference<IDictionary<DbgHelp.SymbolType, IDictionary<string, uint>>> _weakPdbSymbols = new(null);
+    private readonly WeakReference<IDictionary<DbgHelp.SymbolType, IDictionary<string, nint>>> _weakPdbSymbols = new(null!);
 
     
-    private IDictionary<DbgHelp.SymbolType, IDictionary<string, uint>> PdbSymbolsInternal {
+    private IDictionary<DbgHelp.SymbolType, IDictionary<string, nint>> PdbSymbolsInternal {
         get
         {
             if(_weakPdbSymbols.TryGetTarget(out var map))
                 return map;
                 
-            map = new Dictionary<DbgHelp.SymbolType, IDictionary<string, uint>>();
+            map = new Dictionary<DbgHelp.SymbolType, IDictionary<string, nint>>();
 
             if (HasPdb)
             {
@@ -171,9 +170,9 @@ public class NativeLibrary
                 var name = symbolInfo.Name;
                 
                 if (!map.TryGetValue(symbolInfo.Tag, out var sub ))
-                    map[symbolInfo.Tag] = sub = new Dictionary<string, uint>();
+                    map[symbolInfo.Tag] = sub = new Dictionary<string, nint>();
                 
-                sub[name] = (uint)(symbolInfo.Address - (ulong)Address.ToInt64());
+                sub[name] = (nint)(symbolInfo.Address - (ulong)Address.ToInt64());
 
                 return true;
             }
@@ -189,20 +188,17 @@ public class NativeLibrary
             
         Address = module.BaseAddress;
         
-        SymbolCache = new Dictionary<DbgHelp.SymbolType, IDictionary<string, uint>>();
+        SymbolCache = new Dictionary<DbgHelp.SymbolType, IDictionary<string, nint>>();
 
         UpdatePdb([]);
     }
 
-    private void UpdatePdb([NotNull] string[] newSymbolServers)
+    private void UpdatePdb(string[] newSymbolServers)
     {
         HasPdb      = false;
         LibraryInfo = null;
         
         DbgHelp.Cleanup(Address);
-
-        if (newSymbolServers == null)
-            newSymbolServers = [];
         
         _symbolServers = newSymbolServers;
 

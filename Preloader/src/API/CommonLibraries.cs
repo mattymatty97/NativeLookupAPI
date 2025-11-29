@@ -1,5 +1,4 @@
 ﻿using System.IO;
-using System.Runtime.CompilerServices;
 using NativeLookupAPI.Proxy;
 
 namespace NativeLookupAPI.API;
@@ -8,10 +7,9 @@ public static class CommonLibraries
 {
     public static NativeLibrary UnityPlayer { get; }
     
-    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
     static CommonLibraries()
     {
-        UnityPlayer = NativeLibrary.Find(m => m.ModuleName.Equals("UnityPlayer.dll"));
+        UnityPlayer = NativeLibrary.Find(m => m.ModuleName.Equals("UnityPlayer.dll"))!;
         if (!UnityPlayer.HasPdb)
             UnityPlayer.SymbolServers = ["https://symbolserver.unity3d.com/"];
         
@@ -32,7 +30,7 @@ public static class CommonLibraries
                 {
                     var line = reader.ReadLine()!;
                     var split = line.Split("\t");
-                    UnityPlayer.SymbolCache[(DbgHelp.SymbolType)uint.Parse(split[0])][split[1]] = uint.Parse(split[2]);
+                    UnityPlayer.SymbolCache[(DbgHelp.SymbolType)uint.Parse(split[0])][split[1]] = (nint)ulong.Parse(split[2]);
                 }
             }
             catch
@@ -57,7 +55,7 @@ public static class CommonLibraries
                 {
                     foreach (var (name, offset) in memory)
                     {
-                        writer.WriteLine($"{symbol:D}\t{name}\t0x{offset:x8}");
+                        writer.WriteLine($"{symbol:D}\t{name}\t0x{(ulong)offset:x8}");
                     }
                 }
             }

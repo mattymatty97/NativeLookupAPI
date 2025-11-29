@@ -5,6 +5,7 @@
         <AssemblyName>$(ModName)</AssemblyName>
         <AssemblyTitle>$(ModName)</AssemblyTitle>
         <Product>$(ModName)</Product>
+        <Nullable>enable</Nullable>
     </PropertyGroup>
 	
     <PropertyGroup>

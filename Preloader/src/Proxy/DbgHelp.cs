@@ -18,7 +18,7 @@ public static class DbgHelp
     internal static extern bool Cleanup(IntPtr hProcess);
     
     [DllImport("dbghelp.dll", EntryPoint = "SymLoadModuleEx", SetLastError = true, CharSet = CharSet.Ansi)]
-    internal static extern IntPtr LoadPdb(IntPtr hProcess, IntPtr hFile, string iImageName, string moduleName, IntPtr baseOfDll, uint dllSize, IntPtr data, uint flags);
+    internal static extern IntPtr LoadPdb(IntPtr hProcess, IntPtr hFile, string iImageName, string? moduleName, IntPtr baseOfDll, uint dllSize, IntPtr data, uint flags);
     
     [DllImport("dbghelp.dll", EntryPoint = "SymGetModuleInfo64", SetLastError = true, CharSet = CharSet.Ansi)]
     internal static extern bool CheckPdb(IntPtr hProcess, IntPtr address, ref ImageHlpModule64  moduleInfo);
