@@ -18,7 +18,7 @@ public static class CommonLibraries
         if (!UnityPlayer.HasPdb)
             return;
 
-        var info = UnityPlayer.LibraryInfo;
+        var info = UnityPlayer.LibraryInfo!.Value;
         var guid = info.PdbSig70.ToString("N").ToUpper() + info.PdbAge;
 
         var cacheFile = Path.Combine(NativeLookupAPI.ModCachePath, $"{info.ModuleName}.{guid}.tsv");
@@ -46,7 +46,7 @@ public static class CommonLibraries
             if (!library.HasPdb)
                 return;
             
-            var finalInfo = library.LibraryInfo;
+            var finalInfo = library.LibraryInfo!.Value;
             var finalGuid = finalInfo.PdbSig70.ToString("N").ToUpper() + finalInfo.PdbAge;
 
             var outputCacheFile = Path.Combine(NativeLookupAPI.ModCachePath, $"{finalInfo.ModuleName}.{finalGuid}.tsv");

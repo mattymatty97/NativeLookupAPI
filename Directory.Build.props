@@ -52,7 +52,8 @@
         <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
         <LangVersion>latest</LangVersion>
     </PropertyGroup>
-	    <Target Name="CleanForUpload" BeforeTargets="Build">
+    
+    <Target Name="CleanForUpload" BeforeTargets="Build" Condition="$(SolutionName) == NativeLookupAPI">
         <PropertyGroup>
             <DistributionDir>$(SolutionDir)\Output\dist</DistributionDir>
         </PropertyGroup>
@@ -62,7 +63,7 @@
         <MakeDir Directories="$(DistributionDir)" />
     </Target>
 	
-    <Target Name="Upload" AfterTargets="CopyForUpload">
+    <Target Name="Upload" AfterTargets="CopyForUpload" Condition="$(SolutionName) == NativeLookupAPI">
         <PropertyGroup>
             <DistributionDir>$(SolutionDir)\Output\dist</DistributionDir>
             <DistributionArchive>$(SolutionDir)\Output\$(ModName)-v$(Version).zip</DistributionArchive>

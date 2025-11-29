@@ -6,7 +6,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.InteropServices;
 using NativeLookupAPI.Proxy;
-#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
 
 namespace NativeLookupAPI.API;
 
@@ -50,8 +49,11 @@ public class NativeLibrary
     public IntPtr Address;
 
     public bool HasPdb { get; private set; }
+
+    public Guid? PdbGUID => LibraryInfo?.PdbSig70;
+    public string Signature => HasPdb ? LibraryInfo!.Value.PdbSig70.ToString("N").ToUpper() + LibraryInfo!.Value.PdbAge : null;
     
-    public DbgHelp.ImageHlpModule64 LibraryInfo { get; private set; } = default;
+    public DbgHelp.ImageHlpModule64? LibraryInfo { get; private set; }
 
     public string[] SymbolServers
     {
@@ -194,7 +196,8 @@ public class NativeLibrary
 
     private void UpdatePdb([NotNull] string[] newSymbolServers)
     {
-        HasPdb = false;
+        HasPdb      = false;
+        LibraryInfo = null;
         
         DbgHelp.Cleanup(Address);
 
