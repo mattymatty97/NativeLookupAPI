@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using NativeLookupAPI.Proxy;
@@ -45,26 +48,13 @@ public class NativeLibrary
 
     public string Name => Module.ModuleName;
 
-    public IntPtr Address;
+    public IntPtr Address => Module.BaseAddress;
 
-    public bool HasPdb { get; private set; }
+    public string? CacheDirectory { get; set; }
 
-    public Guid? PdbGUID => LibraryInfo?.PdbSig70;
-    public string? Signature => HasPdb ? LibraryInfo!.Value.PdbSig70.ToString("N").ToUpper() + LibraryInfo!.Value.PdbAge : null;
-
-    public DbgHelp.ImageHlpModule64? LibraryInfo { get; private set; }
-
-    public string[] SymbolServers
-    {
-        get => _symbolServers;
-        set => UpdatePdb(value);
-    }
+    public string[] SymbolServers { get; set; } = [];
 
     public int LastError { get; private set; }
-
-    public event Action<NativeLibrary>? OnFinalize;
-
-    public IDictionary<DbgHelp.SymbolType,IDictionary<string, nint>> SymbolCache { get; }
 
     public IDictionary<DbgHelp.SymbolType, IDictionary<string, nint>> PdbSymbols
     {
@@ -85,17 +75,78 @@ public class NativeLibrary
         }
     }
 
+    public void LoadCache()
+    {
+        var cacheFile = CacheFilePath;
+        if (cacheFile == null)
+            return;
+        if (!File.Exists(cacheFile))
+            return;
+
+        try
+        {
+            using var reader = new StreamReader(cacheFile);
+            while (reader.Peek() >= 0)
+            {
+                var line = reader.ReadLine()!;
+                var split = line.Split("\t");
+
+                var symbolType = (DbgHelp.SymbolType)uint.Parse(split[0]);
+                if (!_symbolCache.TryGetValue(symbolType, out var cache))
+                    cache = _symbolCache[symbolType] = [];
+
+                var symbolName = split[1];
+
+                var addressString = split[2];
+                if (!addressString.StartsWith("0x"))
+                    throw new FormatException("Address did not start with '0x'");
+                var address = (nint)ulong.Parse(addressString[2..], NumberStyles.HexNumber);
+                cache[symbolName] = address;
+            }
+        }
+        catch (Exception e)
+        {
+            NativeLookupAPI.Log.LogError($"Exception while loading cache, it will be regenerated.");
+            NativeLookupAPI.Log.LogError(e);
+        }
+    }
+
+    public void WriteCache()
+    {
+        var cacheFile = CacheFilePath;
+        if (cacheFile == null)
+            return;
+        try
+        {
+            using var writer = new StreamWriter(cacheFile);
+            foreach (var (symbol, memory) in _symbolCache)
+            {
+                foreach (var (name, offset) in memory)
+                    writer.WriteLine($"{symbol:D}\t{name}\t0x{(ulong)offset:x8}");
+            }
+        }
+        catch (Exception e)
+        {
+            NativeLookupAPI.Log.LogError($"Exception while writing cache.");
+            NativeLookupAPI.Log.LogError(e);
+            try
+            {
+                File.Delete(cacheFile);
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+    }
+
     public bool TryGetExportedFunctionOffset(string functionName, out nint offset)
     {
-        offset = 0;
+        if (!_symbolCache.TryGetValue(DbgHelp.SymbolType.Export, out var cache))
+            _symbolCache[DbgHelp.SymbolType.Export] = cache = [];
 
-        if (!SymbolCache.TryGetValue(DbgHelp.SymbolType.Export, out var cache))
-            SymbolCache[DbgHelp.SymbolType.Export] = cache = new Dictionary<string, nint>();
-
-        if(cache.TryGetValue(functionName, out offset))
-        {
+        if (cache.TryGetValue(functionName, out offset))
             return offset != 0;
-        }
 
         var address = Kernel32.GetExportedFunctionAddress(Address, functionName);
         if (address == IntPtr.Zero)
@@ -103,11 +154,13 @@ public class NativeLibrary
             offset = 0;
             cache[functionName] = 0;
             LastError = Marshal.GetLastWin32Error();
+            WriteCache();
             return false;
         }
 
         offset = address.ToInt32() - Address.ToInt32();
         cache[functionName] = offset;
+        WriteCache();
         return true;
     }
 
@@ -116,44 +169,66 @@ public class NativeLibrary
         if (symbolType == DbgHelp.SymbolType.Export)
             return TryGetExportedFunctionOffset(symbolName, out symbolOffset);
 
-        if (!SymbolCache.TryGetValue(symbolType, out var cache))
-            SymbolCache[DbgHelp.SymbolType.Export] = cache = new Dictionary<string, nint>();
+        if (!_symbolCache.TryGetValue(symbolType, out var cache))
+            _symbolCache[symbolType] = cache = [];
 
         if (cache.TryGetValue(symbolName, out symbolOffset))
             return symbolOffset != 0;
 
-        if (!HasPdb)
-            return false;
-
-        var found = PdbSymbolsInternal.TryGetValue(symbolType, out var symbols) && 
+        var found = PdbSymbolsInternal.TryGetValue(symbolType, out var symbols) &&
                 symbols.TryGetValue(symbolName, out symbolOffset);
 
         cache[symbolName] = found ? symbolOffset : 0;
-
+        WriteCache();
         return found;
     }
 
     // Internal Data
+    enum PdbState
+    {
+        Unloaded,
+        Loaded,
+        Failed,
+    }
+
+    private readonly string _signature;
+
+    private PdbState _pdbState;
+
+    private Dictionary<DbgHelp.SymbolType, Dictionary<string, nint>> _symbolCache = [];
 
     private static readonly Dictionary<ProcessModule, WeakReference<NativeLibrary>> KnownModules = [];
 
-    private string[] _symbolServers = [];
+    private readonly WeakReference<Dictionary<DbgHelp.SymbolType, Dictionary<string, nint>>> _weakPdbSymbols = new(null!);
 
-    private readonly WeakReference<IDictionary<DbgHelp.SymbolType, IDictionary<string, nint>>> _weakPdbSymbols = new(null!);
 
-    private IDictionary<DbgHelp.SymbolType, IDictionary<string, nint>> PdbSymbolsInternal {
+    private Dictionary<DbgHelp.SymbolType, Dictionary<string, nint>> PdbSymbolsInternal
+    {
         get
         {
-            if(_weakPdbSymbols.TryGetTarget(out var map))
+            if (_weakPdbSymbols.TryGetTarget(out var map))
                 return map;
 
-            map = new Dictionary<DbgHelp.SymbolType, IDictionary<string, nint>>();
+            map = [];
 
-            if (HasPdb)
+            bool PopulateMap(ref DbgHelp.SymbolInfo symbolInfo, uint size, IntPtr context)
+            {
+                var name = symbolInfo.Name;
+
+                if (!map.TryGetValue(symbolInfo.Tag, out var sub))
+                    map[symbolInfo.Tag] = sub = new Dictionary<string, nint>();
+
+                sub[name] = (nint)(symbolInfo.Address - (ulong)Address.ToInt64());
+
+                return true;
+            }
+
+            DownloadPdb();
+
+            if (_pdbState == PdbState.Loaded)
             {
                 if (!DbgHelp.EnumerateSymbols(Address, Address, "!", PopulateMap, 0))
                 {
-
                     LastError = Marshal.GetLastWin32Error();
                     NativeLookupAPI.Log.LogError($"{nameof(LastError)}: {LastError}");
                 }
@@ -162,19 +237,38 @@ public class NativeLibrary
             _weakPdbSymbols.SetTarget(map);
 
             return map;
-
-            bool PopulateMap(ref DbgHelp.SymbolInfo symbolInfo, uint size, IntPtr context)
-            {
-                var name = symbolInfo.Name;
-
-                if (!map.TryGetValue(symbolInfo.Tag, out var sub ))
-                    map[symbolInfo.Tag] = sub = new Dictionary<string, nint>();
-
-                sub[name] = (nint)(symbolInfo.Address - (ulong)Address.ToInt64());
-
-                return true;
-            }
         }
+    }
+
+    private string? CacheFilePath
+    {
+        get
+        {
+            if (CacheDirectory == null)
+                return null;
+            return Path.Combine(CacheDirectory, $"{Module.ModuleName}.{_signature}.tsv");
+        }
+    }
+
+    private string GetPDBSignature()
+    {
+        if (!DbgHelp.Initialize(Address, "", false))
+            throw new Win32Exception();
+
+        var baseAddress = DbgHelp.LoadPdb(Address, IntPtr.Zero, Name, null, Address, 0, IntPtr.Zero, 0);
+        if (baseAddress == IntPtr.Zero)
+            throw new Win32Exception();
+
+        var moduleInfo = new DbgHelp.ImageHlpModule64()
+        {
+            SizeOfStruct = (uint)Marshal.SizeOf(typeof(DbgHelp.ImageHlpModule64))
+        };
+
+        if (!DbgHelp.CheckPdb(Address, Address, ref moduleInfo))
+            throw new Win32Exception();
+
+        DbgHelp.Cleanup(Address);
+        return $"{moduleInfo.PdbSig70.ToString("N").ToUpper()}{moduleInfo.PdbAge}";
     }
 
     private NativeLibrary(ProcessModule module)
@@ -183,26 +277,21 @@ public class NativeLibrary
             throw new DllNotFoundException();
 
         Module = module;
-
-        Address = module.BaseAddress;
-
-        SymbolCache = new Dictionary<DbgHelp.SymbolType, IDictionary<string, nint>>();
-
-        UpdatePdb([]);
+        _signature = GetPDBSignature();
     }
 
-    private void UpdatePdb(string[] newSymbolServers)
+    private bool DownloadPdb()
     {
-        HasPdb      = false;
-        LibraryInfo = null;
+        if (_pdbState != PdbState.Unloaded)
+            return true;
+
+        _pdbState = PdbState.Failed;
 
         DbgHelp.Cleanup(Address);
 
-        _symbolServers = newSymbolServers;
-
         var symbolPath = $"cache*{NativeLookupAPI.PdbCachePath}";
 
-        foreach (var server in _symbolServers)
+        foreach (var server in SymbolServers)
         {
             if (server.IndexOfAny(['*', ' ']) != -1)
                 continue;
@@ -210,19 +299,19 @@ public class NativeLibrary
             symbolPath += $";srv*{server}";
         }
 
-        if (!DbgHelp.Initialize(Address, symbolPath, false) || 
+        if (!DbgHelp.Initialize(Address, symbolPath, false) ||
             !DbgHelp.RegisterCallback(Address, DbgHelpCallback, Address))
         {
             LastError = Marshal.GetLastWin32Error();
-            return;
+            return false;
         }
 
-        var baseAddress = DbgHelp.LoadPdb(Address, IntPtr.Zero, Name, null, Address, 0, IntPtr.Zero, 0 );
+        var baseAddress = DbgHelp.LoadPdb(Address, IntPtr.Zero, Name, null, Address, 0, IntPtr.Zero, 0);
 
         if (baseAddress == IntPtr.Zero)
         {
             LastError = Marshal.GetLastWin32Error();
-            return;
+            return false;
         }
 
         var moduleInfo = new DbgHelp.ImageHlpModule64()
@@ -230,15 +319,19 @@ public class NativeLibrary
             SizeOfStruct = (uint)Marshal.SizeOf(typeof(DbgHelp.ImageHlpModule64))
         };
 
-        if(!DbgHelp.CheckPdb(Address, baseAddress, ref moduleInfo))
+        if (!DbgHelp.CheckPdb(Address, baseAddress, ref moduleInfo))
         {
             LastError = Marshal.GetLastWin32Error();
-            return;
+            return false;
         }
 
-        LibraryInfo = moduleInfo;
+        if (moduleInfo.SymType == DbgHelp.SymType.SymPdb)
+        {
+            _pdbState = PdbState.Loaded;
+            return true;
+        }
 
-        HasPdb = moduleInfo.SymType == DbgHelp.SymType.SymPdb;
+        return false;
     }
 
     private bool DbgHelpCallback(IntPtr hProcess, DbgHelp.SymActionCode actionCode, IntPtr data, IntPtr context)
@@ -266,7 +359,5 @@ public class NativeLibrary
 
         return false;
     }
-
-    ~NativeLibrary() => OnFinalize?.Invoke(this);
 
 }

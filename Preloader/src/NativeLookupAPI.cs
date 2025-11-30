@@ -23,12 +23,14 @@ internal class NativeLookupAPI
 
 	public static readonly string ModCachePath = Path.GetFullPath(Path.Combine(Paths.CachePath, NAME));
 	public static readonly string PdbCachePath = Path.GetFullPath(Path.Combine(ModCachePath, ".pdb"));
+	public static readonly string SymbolCachePath = Path.GetFullPath(Path.Combine(Paths.ConfigPath, NAME));
 
 	// Cannot be renamed, method name is important
 	public static void Initialize()
 	{
 		Log.LogInfo("Preloader Started");
 		Directory.CreateDirectory(PdbCachePath);
+		Directory.CreateDirectory(SymbolCachePath);
 		//trigger static constructor
 		_ = CommonLibraries.UnityPlayer;
 	}
