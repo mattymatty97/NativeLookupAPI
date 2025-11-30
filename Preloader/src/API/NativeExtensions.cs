@@ -31,8 +31,16 @@ public static class NativeExtensions
         
         nativeFunction = new NativeFunction<T>(library, functionName, offset);
         return true;
-
     }
+    
+    public static NativeFunction<T>? GetNativeFunction<T>(this NativeLibrary library, string functionName) where T : class
+    {
+        if (library.TryGetNativeFunction<T>(functionName, out var function))
+            return function;
+        
+        return  null;
+    }
+    
     
     public struct NativeFunction<T> where T : class
     {
