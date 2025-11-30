@@ -6,13 +6,13 @@ namespace NativeLookupAPI.API;
 public static class CommonLibraries
 {
     public static NativeLibrary UnityPlayer { get; }
-    
+
     static CommonLibraries()
     {
         UnityPlayer = NativeLibrary.Find(m => m.ModuleName.Equals("UnityPlayer.dll"))!;
         if (!UnityPlayer.HasPdb)
             UnityPlayer.SymbolServers = ["https://symbolserver.unity3d.com/"];
-        
+
         if (!UnityPlayer.HasPdb)
             return;
 
@@ -43,7 +43,7 @@ public static class CommonLibraries
         {
             if (!library.HasPdb)
                 return;
-            
+
             var finalInfo = library.LibraryInfo!.Value;
             var finalGuid = finalInfo.PdbSig70.ToString("N").ToUpper() + finalInfo.PdbAge;
 

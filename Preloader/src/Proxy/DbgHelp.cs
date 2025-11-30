@@ -7,42 +7,42 @@ public static class DbgHelp
 {
     [DllImport("dbghelp.dll", EntryPoint = "SymInitialize", SetLastError = true, CharSet = CharSet.Ansi)]
     internal static extern bool Initialize(IntPtr hProcess, string userSearchPath, bool fInvadeProcess);
-    
+
     [DllImport("dbghelp.dll", EntryPoint = "SymSetOptions", SetLastError = true, CharSet = CharSet.Ansi)]
     internal static extern DbgHelpOptions SetOptions(DbgHelpOptions options);
-    
+
     [DllImport("dbghelp.dll", EntryPoint = "SymGetOptions", SetLastError = true, CharSet = CharSet.Ansi)]
     internal static extern DbgHelpOptions GetOptions();
-    
+
     [DllImport("dbghelp.dll", EntryPoint = "SymCleanup", SetLastError = true, CharSet = CharSet.Ansi)]
     internal static extern bool Cleanup(IntPtr hProcess);
-    
+
     [DllImport("dbghelp.dll", EntryPoint = "SymLoadModuleEx", SetLastError = true, CharSet = CharSet.Ansi)]
     internal static extern IntPtr LoadPdb(IntPtr hProcess, IntPtr hFile, string iImageName, string? moduleName, IntPtr baseOfDll, uint dllSize, IntPtr data, uint flags);
-    
+
     [DllImport("dbghelp.dll", EntryPoint = "SymGetModuleInfo64", SetLastError = true, CharSet = CharSet.Ansi)]
     internal static extern bool CheckPdb(IntPtr hProcess, IntPtr address, ref ImageHlpModule64  moduleInfo);
-    
+
     [DllImport("dbghelp.dll", EntryPoint = "SymFromName", SetLastError = true, CharSet = CharSet.Ansi)]
     internal static extern bool FindSymbol(IntPtr hProcess, string name, ref SymbolInfo symbol);
-    
+
     [DllImport("dbghelp.dll", EntryPoint = "SymEnumSymbols", SetLastError = true, CharSet = CharSet.Ansi)]
     internal static extern bool EnumerateSymbols(IntPtr hProcess, IntPtr baseOfDll, string filter, EnumerateSymbolsCallbackDelegate callback, uint options);
-    
+
     [UnmanagedFunctionPointer(CallingConvention.Winapi, SetLastError = true)]
     internal delegate bool EnumerateSymbolsCallbackDelegate(ref SymbolInfo symbolInfo, uint size, IntPtr context);
-    
+
     [DllImport("dbghelp.dll", EntryPoint = "SymRegisterCallback64", SetLastError = true, CharSet = CharSet.Ansi)]
     internal static extern bool RegisterCallback(IntPtr hProcess, LogCallbackDelegate callback, IntPtr context);
-    
+
     [UnmanagedFunctionPointer(CallingConvention.Winapi, SetLastError = true)]
     internal delegate bool LogCallbackDelegate(IntPtr hProcess, SymActionCode actionCode, IntPtr data, IntPtr context);
-    
+
     static DbgHelp()
     {
 	    //force dbghelp to use winhttp instead of winInet
 	    Environment.SetEnvironmentVariable("DBGHELP_WINHTTP", "1");
-	    
+
         //set dbghelp options
         SetOptions(
             DbgHelpOptions.Debug |
@@ -53,7 +53,7 @@ public static class DbgHelp
             DbgHelpOptions.Undname
         );
     }
-    
+
     public enum SymbolType: uint
     {
         None = 0,
@@ -243,7 +243,7 @@ public static class DbgHelp
 	    /// </summary>
         Undname                     = 0x00000002UL,
     }
-    
+
     public enum SymType : uint
     {
 	    SymNone = 0,
@@ -257,36 +257,36 @@ public static class DbgHelp
 	    SymVirtual = 8,
 	    NumSymTypes = 9,
     }
-    
+
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
     public struct ImageHlpModule64
 	{
 		internal uint SizeOfStruct;
-		
+
 		internal ulong BaseOfImage;
-		
+
 		internal uint ImageSize;
-		
+
 		internal uint TimeDateStamp;
-		
+
 		internal uint CheckSum;
-		
+
 		internal uint NumSyms;
-		
+
 		internal SymType SymType;
-		
+
 		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
 		internal string ModuleName;
-		
+
 		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
 		internal string ImageName;
-		
+
 		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
 		internal string LoadedImageName;
-		
+
 		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
 		internal string LoadedPdbName;
-		
+
 		internal uint CVSig;
 
 		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 780)]
@@ -323,7 +323,7 @@ public static class DbgHelp
 
 		internal uint Reserved;
 	}
-    
+
 	[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
 	public struct SymbolInfo
 	{
@@ -355,7 +355,7 @@ public static class DbgHelp
 		internal uint NameLen;
 
 		internal uint MaxNameLen;
-		
+
 		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 1024)]
 		internal string Name;
 	}
