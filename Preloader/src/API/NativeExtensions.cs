@@ -22,7 +22,7 @@ public static class NativeExtensions
     }
     
     public static bool TryGetNativeFunction<T>(this NativeLibrary library, string functionName,
-        out NativeFunction<T> nativeFunction) where T : class
+        out NativeFunction<T> nativeFunction) where T : Delegate
     {
         nativeFunction = default;
         if (!library.TryGetSymbolOffset(DbgHelp.SymbolType.Export, functionName, out var offset)
@@ -33,7 +33,7 @@ public static class NativeExtensions
         return true;
     }
     
-    public static NativeFunction<T>? GetNativeFunction<T>(this NativeLibrary library, string functionName) where T : class
+    public static NativeFunction<T>? GetNativeFunction<T>(this NativeLibrary library, string functionName) where T : Delegate
     {
         if (library.TryGetNativeFunction<T>(functionName, out var function))
             return function;
@@ -42,7 +42,7 @@ public static class NativeExtensions
     }
     
     
-    public struct NativeFunction<T> where T : class
+    public struct NativeFunction<T> where T : Delegate
     {
         public NativeLibrary Library { get; }
 
